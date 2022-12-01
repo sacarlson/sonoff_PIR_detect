@@ -89,11 +89,10 @@ const int SONOFF_RELAY_PINS[4] =    {12, 12, 12, 12};
 #define Brg_daynight_0 5
 
 // You should get Auth Token in the Blynk App.
-//char auth[] = "6v9WeLFxelyIyW2y1mtorBYw0EK38L-Z";        //sonoff_2 device  master device A
-char auth_Bridge2[] = "........8L-Z";  //sonoff_2 device  master device A
-char auth[] = "........i3Ao";          //sonoff_1 device slave device B
-char auth_Bridge3[] = ".........lxWB";  //sonoff_3 device slave device C
-char auth_Bridge4[] = "..........h5Zg";  //sonoff_4 device slave planed expansion device D
+char auth[] = "...F9R";          //sonoff_1 device slave device B ( pbc condo 119 prototype)
+char auth_Bridge2[] = "...L-Z";  //sonoff_2 device slave device A (2nd floor rear window)
+char auth_Bridge3[] = "...xWB";  //sonoff_3 device slave device C  (loby table light)
+char auth_Bridge4[] = "...5Zg";  //sonoff_4 device master device D (2nd floor flood light next to router)
 
 const int motionSensor = SONOFF_RX;
 //const int motionSensor = 4;  // D2 on nodemcu didn't get rx to work on nodemcu
@@ -101,17 +100,17 @@ int detect_count = 0;
 // timer_event is what we set to start timeing from triger time.  we add millis() + a value in time we want to end the event
 unsigned long timer_event = millis();
 // default trig_time_min the time the light will remain on after a motion detection trigered
-int trig_time_min = 1;
+int trig_time_min = 15;
 int daynight = 0;  // this value should be changes by blyk eventor timer, 1 for day time, 0 night for night time
 
 // Your WiFi credentials.
 // Set password to "" for open networks.
-char ssid[] = "FreeNet";
-char pass[] = "aaaabbbb";
+char ssid[] = "Wifi";
+char pass[] = "password";
 
 #ifndef STASSID
-#define STASSID "FreeNet"
-#define STAPSK  "aaaabbbb"
+#define STASSID "Wifi"
+#define STAPSK  "password"
 #endif
 
 const char* ssidota = STASSID;
@@ -132,8 +131,8 @@ int state_sonoff = 0;
 int hour_day = 6;
 int min_day = 0;
 
-int hour_night = 18;
-int min_night = 10;
+int hour_night = 17;
+int min_night = 30;
 int disable_master = 1;
 int false_alarm = 0;
 unsigned long last_triger_time = millis();
@@ -164,19 +163,16 @@ void myTimerEvent(){
     }
   }
   // hour() and minute() is updated by rtc no need remote bridge any more
-  if (hour()==hour_night && minute()==min_night){
-    daynight = 0;
-    Blynk.virtualWrite(V10,"daynight set 0: ");
-    //bridge1.virtualWrite(V22, Brg_daynight_0);
-    //bridge2.virtualWrite(V22, Brg_daynight_0);
-    //bridge3.virtualWrite(V22, Brg_daynight_0);
-  }
-  if (hour()==hour_day && minute()==min_day){
+  //if (hour()==hour_night && minute()==min_night){
+  if (hour()>=hour_night || hour()<=hour_day){
+    if (minute() >= min_night){
+      daynight = 0;
+      Blynk.virtualWrite(V10,"daynight set 0: ");  
+    } else {
+      daynight =1;
+    }
+  } else {
     daynight = 1;
-    Blynk.virtualWrite(V10,"daynight set 1: ");
-    //bridge1.virtualWrite(V22, Brg_daynight_1);
-    //bridge2.virtualWrite(V22, Brg_daynight_1);
-    //bridge3.virtualWrite(V22, Brg_daynight_1);
   }
   
   if (daynight == 1){
@@ -189,8 +185,8 @@ void myTimerEvent(){
   
   // not sure this led_builtin is working on sonoff, need to use the SONOFF_LED
   digitalWrite(LED_BUILTIN, ledstate);
-  Serial.println("digitalread motionSensor");
-  Serial.println(digitalRead(motionSensor)); 
+  //Serial.println("digitalread motionSensor");
+  //Serial.println(digitalRead(motionSensor)); 
   if ( timer_event <= millis()){
     setState(0,0); // turn off relay if timer_event runs out  
   }
@@ -233,8 +229,8 @@ void setState(int state, int channel) {
   //relay
   //digitalWrite(SONOFF_RELAY_PINS[channel], state);
   digitalWrite(SONOFF_RELAY, state);
-  Serial.println("setState ");
-  Serial.println(state);
+  //Serial.println("setState ");
+  //Serial.println(state);
   //led
   digitalWrite(SONOFF_LED, (state + 1) % 2); // led is active low 
   Blynk.virtualWrite(V1, state);  
@@ -261,11 +257,11 @@ void clockDisplay()
 
   String currentTime = String(hour()) + ":" + minute() + ":" + second();
   String currentDate = String(day()) + " " + month() + " " + year();
-  Serial.print("Current time: ");
-  Serial.print(currentTime);
-  Serial.print(" ");
-  Serial.print(currentDate);
-  Serial.println();
+  //Serial.print("Current time: ");
+  //Serial.print(currentTime);
+  //Serial.print(" ");
+  //Serial.print(currentDate);
+  //Serial.println();
 
   // Send time to the App
   Blynk.virtualWrite(V11, currentTime);
@@ -317,35 +313,24 @@ BLYNK_WRITE(V1){
 
 //unsigned long last_triger_time = 0;
 //unsigned long min_triger_time = 10000000L;
-unsigned long triger_filter_time = 2000L;
+unsigned long triger_filter_time = 1500L;
 unsigned long max_triger_time = 0L;
-unsigned long triger_timeout = 40000L;
+unsigned long triger_timeout = 9500L;
 
 ICACHE_RAM_ATTR void detectsMovement() {
   bool ledstate = digitalRead(SONOFF_LED);
   bool motionSensor_pin_state = digitalRead(motionSensor);
-  Serial.println("motionSenso pin state");
-  Serial.println(motionSensor_pin_state);
-  for (int i = 1; i < 10; ++i) {
-    if (digitalRead(motionSensor) == 0){
-      //Serial.println("not real movment detect");
-      //false_alarm++;
-      //Blynk.virtualWrite(V18, false_alarm);
-      return;
-    }
-  }
+  //Serial.println("motionSenso pin state");
+  //Serial.println(motionSensor_pin_state);
   //max_triger_time = triger_filter_time;
   //Blynk.virtualWrite(V18, false_alarm);
   Blynk.virtualWrite(V21,max_triger_time);
   Blynk.virtualWrite(V19,min_triger_time);
   Blynk.virtualWrite(V25,(millis() - last_triger_time));
-  if ((millis() - last_triger_time) > triger_timeout){
-    false_alarm++;
-    last_triger_time = millis();
-    Blynk.virtualWrite(V18, false_alarm);
-    return; 
-  }
-  
+ 
+  //Serial.println("diff last trig time");
+  //Serial.println((millis() - last_triger_time));
+
   if ((millis() - last_triger_time) < triger_filter_time){ 
     false_alarm++;
     //Blynk.virtualWrite(V25,last_triger_time);
@@ -353,6 +338,15 @@ ICACHE_RAM_ATTR void detectsMovement() {
     Blynk.virtualWrite(V18, false_alarm);
     return;
   }
+
+  if ((millis() - last_triger_time) > triger_timeout){
+    false_alarm++;
+    last_triger_time = millis();
+    Blynk.virtualWrite(V18, false_alarm);
+    return; 
+  }
+  
+  
  
   if (max_triger_time < (millis() - last_triger_time)){
     max_triger_time = (millis() - last_triger_time);
@@ -369,10 +363,10 @@ ICACHE_RAM_ATTR void detectsMovement() {
   
   last_triger_time=millis();
   digitalWrite(SONOFF_LED, !ledstate);
-  Serial.println("MOTION DETECTED!!!"); 
+  //Serial.println("MOTION DETECTED!!!"); 
   detect_count++;
-  Serial.println("sensor detect count");
-  Serial.println(detect_count); 
+  //Serial.println("sensor detect count");
+  //Serial.println(detect_count); 
   Blynk.virtualWrite(V16, detect_count); // added graph to this number works ok
   on_event();
 }
@@ -456,7 +450,7 @@ BLYNK_CONNECTED() {
   //bridge1.setAuthToken(auth_Bridge3); // Token of the hardware B note this device can't bridge to itself so commented out here
   bridge2.setAuthToken(auth_Bridge2); // Token of the hardware A note: bridge2 device A is now master
   bridge3.setAuthToken(auth_Bridge3); // Token of the hardware C  
-  //bridge4.setAuthToken(auth_Bridge4); // Token of the hardware D  note: this device not online yet 
+  //bridge4.setAuthToken(auth_Bridge4); // Token of the hardware D  
   rtc.begin();
 }
 
@@ -547,8 +541,13 @@ void setup()
   Blynk.virtualWrite(V20,triger_filter_time);
   Blynk.virtualWrite(V26,triger_timeout);
    
-  ArduinoOTA.setHostname("SONOFF_PIR_v3_B");
-  ArduinoOTA.setPassword("scottc");
+  // I noted to get ArduinoOTA to work I had to first upload the BasicOTA first.  after that installed ok then this one also installed
+  // see File>examples>ArduinoOTA>BasicOTA, open it compile it and install it, then try this one again otherwise I would get error exit 1
+  // I found the real problem was the motion sensor interupt that broke OTA.
+  // this new version disables interupt when OTA is active.  work around to load this new version 
+  // is to remove motion sensor from device until after loading new version.
+  ArduinoOTA.setHostname("SONOFF");
+  ArduinoOTA.setPassword("password");
   ArduinoOTA.onStart([]() {
     String type;
     if (ArduinoOTA.getCommand() == U_FLASH) {
@@ -592,8 +591,10 @@ void setup()
 }
 
 void loop()
-{
-  Blynk.run();
+{  
+  Blynk.run();  
   timer.run(); // Initiates BlynkTimer
+  detachInterrupt(digitalPinToInterrupt(motionSensor));
   ArduinoOTA.handle();
+  attachInterrupt(digitalPinToInterrupt(motionSensor), detectsMovement, RISING);
 }
